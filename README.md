@@ -53,6 +53,7 @@ Options:
   --kubernetes       Enable Kubernetes specific processors
   --strict           Prohibits properties not in the schema
                      (additionalProperties: false)
+  --all              Whether or not to generate all.json
   --help             Show this message and exit.
 ```
 

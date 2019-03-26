@@ -1,5 +1,5 @@
 FROM python:2-alpine
-MAINTAINER Gareth Rushgrove "gareth@morethanseven.net"
+MAINTAINER Ma Yongcong "mayongcong@gmail.com"
 
 COPY . /src
 RUN cd src && pip install -e .
