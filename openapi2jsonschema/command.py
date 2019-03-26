@@ -5,6 +5,7 @@ import yaml
 import urllib
 import os
 import sys
+import copy
 
 from jsonref import JsonRef
 import click
@@ -108,6 +109,29 @@ def change_dict_values(d, prefix, version):
     except AttributeError:
         return d
 
+def change_dict_values_v2(d, prefix, version):
+    new = {}
+    try:
+        for k, v in d.iteritems():
+            new_v = v
+            if isinstance(v, dict):
+                new_v = change_dict_values_v2(v, prefix, version)
+            elif isinstance(v, list):
+                new_v = list()
+                for x in v:
+                    new_v.append(change_dict_values_v2(x, prefix, version))
+            elif isinstance(v, basestring):
+                if k == "$ref":
+                    if version < '3':
+                        new_v = "%s%s" % (prefix, v)
+                    else:
+                        new_v = v.replace("#/components/schemas/", "%s#/definitions/" % prefix)
+            else:
+                new_v = v
+            new[k] = new_v
+        return new
+    except AttributeError:
+        return d
 
 def info(message):
     click.echo(click.style(message, fg='green'))
@@ -127,8 +151,9 @@ def error(message):
 @click.option('--stand-alone', is_flag=True, help='Whether or not to de-reference JSON schemas')
 @click.option('--kubernetes', is_flag=True, help='Enable Kubernetes specific processors')
 @click.option('--strict', is_flag=True, help='Prohibits properties not in the schema (additionalProperties: false)')
+@click.option('--all', is_flag=True, help='Whether or not to generate all.json')
 @click.argument('schema', metavar='SCHEMA_URL')
-def default(output, schema, prefix, stand_alone, kubernetes, strict):
+def default(output, schema, prefix, stand_alone, kubernetes, strict, all):
     """
     Converts a valid OpenAPI specification into a set of JSON Schema files
     """
@@ -145,7 +170,7 @@ def default(output, schema, prefix, stand_alone, kubernetes, strict):
     info("Parsing schema")
     # Note that JSON is valid YAML, so we can use the YAML parser whether
     # the schema is stored in JSON or YAML
-    data = yaml.load(response.read())
+    data = yaml.load(response.read(), Loader=yaml.FullLoader)
 
     if 'swagger' in data:
         version = data['swagger']
@@ -171,6 +196,19 @@ def default(output, schema, prefix, stand_alone, kubernetes, strict):
             if strict:
                 definitions = additional_properties(definitions)
             definitions_file.write(json.dumps({"definitions": definitions}, indent=2))
+    else:
+        with open("%s/_definitions.json" % output, 'w') as definitions_file:
+            definitions = data['components']['schemas']
+            if strict:
+                definitions = additional_properties(definitions)
+            new_definitions = {}
+            for title in definitions:
+                tmp = copy.deepcopy(definitions[title])
+                if (tmp.has_key('properties')):
+                    tmp['properties'] = change_dict_values_v2(tmp['properties'], '', version)
+                new_definitions[title] = tmp
+
+            definitions_file.write(json.dumps({"definitions": new_definitions}, indent=2))
 
     types = []
 
@@ -181,7 +219,7 @@ def default(output, schema, prefix, stand_alone, kubernetes, strict):
         components = data['components']['schemas']
 
     for title in components:
-        kind = title.split('.')[-1].lower()
+        kind = title.split('.')[-1]
         specification = components[title]
         specification["$schema"] = "http://json-schema.org/schema#"
         specification.setdefault("type", "object")
@@ -224,15 +262,16 @@ def default(output, schema, prefix, stand_alone, kubernetes, strict):
         except Exception as e:
             error("An error occured processing %s: %s" % (kind, e))
 
-    with open("%s/all.json" % output, 'w') as all_file:
-        info("Generating schema for all types")
-        contents = {"oneOf": []}
-        for title in types:
-            if version < '3':
-                contents["oneOf"].append({"$ref": "%s#/definitions/%s" % (prefix, title)})
-            else:
-                contents["oneOf"].append({"$ref": (title.replace("#/components/schemas/", "") + ".json")})
-        all_file.write(json.dumps(contents, indent=2))
+    if all:
+        with open("%s/all.json" % output, 'w') as all_file:
+            info("Generating schema for all types")
+            contents = {"oneOf": []}
+            for title in types:
+                if version < '3':
+                    contents["oneOf"].append({"$ref": "%s#/definitions/%s" % (prefix, title)})
+                else:
+                    contents["oneOf"].append({"$ref": (title.replace("#/components/schemas/", "") + ".json")})
+            all_file.write(json.dumps(contents, indent=2))
 
 
 if __name__ == '__main__':
