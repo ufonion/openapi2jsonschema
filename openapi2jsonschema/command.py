@@ -206,6 +206,8 @@ def default(output, schema, prefix, stand_alone, kubernetes, strict, all):
                 tmp = copy.deepcopy(definitions[title])
                 if (tmp.has_key('properties')):
                     tmp['properties'] = change_dict_values_v2(tmp['properties'], '', version)
+                if (tmp.has_key('items')):
+                    tmp['items'] = change_dict_values_v2(tmp['items'],'',version)
                 new_definitions[title] = tmp
 
             definitions_file.write(json.dumps({"definitions": new_definitions}, indent=2))
