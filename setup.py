@@ -1,10 +1,10 @@
 from setuptools import setup
 
 setup(
-    name='openapi2jsonschema-ufonion',
-    author='ufonion',
+    name='globefish-openapi2jsonschema',
+    author='Marshall Ma',
     author_email='mayongcong@gmail.com',
-    version='0.9.1',
+    version='0.9.2',
     license='Apache License 2.0',
     packages=['openapi2jsonschema',],
     install_requires=[
@@ -23,5 +23,5 @@ setup(
     },
     keywords = 'openapi, jsonschema',
     description = 'A utility to extract JSON Schema from a valid OpenAPI specification.',
-    url = "https://github.com/garethr/openapi2jsonschema/",
+    url = "https://github.com/ufonion/openapi2jsonschema",
 )
